@@ -29,7 +29,10 @@ namespace RandomPersonElasticsearch
     class Program
     {
 
-        static string csv_filename = "RandomPersons10000.csv";
+        static string csv_filename = "RandomPersons1L.csv";
+        static string test_results = "test1.csv";
+        static string test_columns = "name, rowCount, bulklimit, shard, replica, elapsed_time";
+
 
         static void Main(string[] args)
         {
@@ -40,85 +43,49 @@ namespace RandomPersonElasticsearch
 
             var lowLevelClient = new ElasticLowLevelClient(settings);
 
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            
-            int bulkLimit = 1000;
-            int counter = 0;
-            int id = 0;
+            List<string> results = new List<string>();
+
+            //ESTests.InsertIntoES()
+            //ESTests.InsertIntoES(csv_filename, lowLevelClient, 30000, 3, 2);
+
+            // 10, 10 -> 3:26
+            // 3, 5 -> 2:48
+            // 3, 2 -> 2:50
 
 
-            var people = new List<object>
+            for (int i = 30000; i <= 50000; i += 5000)
             {
-                new { index = new { _index = "people", _type = "_doc" }}
-            };
-
-            var person = new Person
-            {
-                FirstName = "Kuddus",
-                LastName = "Miah"
-            };
-
-            var indexCreateResponse = lowLevelClient.Index<BytesResponse>("people", "_doc", PostData.Serializable(person));
-
-
-            using (StreamReader reader = new StreamReader(csv_filename))
-            {
-                reader.ReadLine();
-                while (true)
+                for (int shardCount = 1; shardCount <= 10; shardCount += 2)
                 {
-                    string line = reader.ReadLine();
-                    if (line == null)
+                    for (int replicaCount = 1; replicaCount <= 10; replicaCount += 2)
                     {
-                        break;
-                    }
-                    
-                    var values = line.Split(",");
-                    
-                    if (counter >= bulkLimit)
-                    {
-                        var indexResponse = lowLevelClient.Bulk<StringResponse>(PostData.MultiJson(people));
-                        counter = 0;
-                        people = new List<object>
-                        {
-                           
-                        };
-                        Console.WriteLine("Bulk Insert");
-                    }
-                    else
-                    {
-                        people.Add(new { index = new { _index = "people", _type = "_doc", _id = $"{id}" } });
-                      
-                        people.Add(
-                        new
-                        {
-                            FirstName = values[0],
-                            LastName = values[1],
-                            UserName = values[2],
-                            SSC_Grade = values[3],
-                            HSC_Grade = values[4],
-                            Bachelor_Grade = values[5],
-                            Age = Int32.Parse(values[6]),
-                            Gender = values[7],
-                            Email = values[8],
-                            DateOfBirth = DateTime.Parse(values[9]),
-                            Street = values[10],
-                            Suite = values[11],
-                            City = values[12],
-                            ZipCode = values[13],
-                        });
-                        counter++;
-                    }
 
-                    id++;
+                        Stopwatch sw = new Stopwatch();
 
-                    //Console.WriteLine(line);
+                        sw.Start();
+
+                        ESTests.InsertIntoES(csv_filename, lowLevelClient, false, i, 3, 2);
+
+                        sw.Stop();
+
+                        results.Add($"{"RandomPersons1L"}, 100000, {i}, {shardCount}, {replicaCount}, {sw.Elapsed}");
+                    }
                 }
+
+
             }
 
-            sw.Stop();
+            using (StreamWriter swriter = new StreamWriter(test_results))
+            {
+                swriter.WriteLine(test_columns);
+                foreach (var line in results)
+                {
+                    swriter.WriteLine(line);
+                }
 
-            Console.WriteLine("Time Elapsed: " + sw.Elapsed);
+            }
+
+
 
             Console.ReadLine();
         }
